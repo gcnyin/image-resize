@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">图片工具</string>
+    <string name="empty_hint">点击下方「选择图片」开始</string>
+    <string name="no_image">未选择图片</string>
+    <string name="pick_image">选择图片</string>
+    <string name="save">保存到相册</string>
+    <string name="mode_crop">剪裁</string>
+    <string name="mode_resize">缩放</string>
+    <string name="select_all">全选</string>
+    <string name="apply_crop">应用剪裁</string>
+    <string name="apply_resize">应用缩放</string>
+    <string name="percent_label">比例</string>
+</resources>
