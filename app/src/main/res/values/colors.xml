@@ -1,10 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!--
+        浅色模式（默认配置）调色板。
+        深色模式覆盖值见 values-night/colors.xml，系统切换深浅色时自动生效。
+    -->
+
+    <!-- 品牌色：浅色面板上使用饱和蓝，深色模式换成更亮的蓝以保证对比度 -->
     <color name="primary">#3D5AFE</color>
     <color name="primary_dark">#303F9F</color>
-    <color name="canvas_bg">#141414</color>
-    <color name="panel_bg">#1E1E1E</color>
-    <color name="text_secondary">#BDBDBD</color>
-    <color name="text_hint">#8A8A8A</color>
     <color name="ic_launcher_background">#3D5AFE</color>
+
+    <!-- 浅色：浅灰画布 + 白色面板，白色照片也能和背景区分开 -->
+    <color name="canvas_bg">#F2F3F7</color>
+    <color name="panel_bg">#FFFFFF</color>
+    <color name="text_primary">#1A1B20</color>
+    <color name="text_secondary">#5A5C66</color>
+    <color name="text_hint">#63656F</color>
+
+    <!--
+        剪裁选框覆盖层直接画在用户照片上，不随应用主题变化：
+        压暗色 + 白框 + 深色描边，保证白底图和黑底图上都看得见。
+    -->
+    <color name="crop_dim">#B3000000</color>
+    <color name="crop_frame">#FFFFFFFF</color>
+    <color name="crop_frame_shadow">#59000000</color>
+    <color name="crop_grid">#59FFFFFF</color>
 </resources>

@@ -9,6 +9,16 @@
 - 保存写入系统相册的 `Pictures/图片工具/` 目录（MediaStore，无需存储权限）。
 - 加载时自动按 EXIF 方向摆正照片。
 
+## 深浅色适配
+
+- 主题基于 `Theme.AppCompat.DayNight.NoActionBar`，跟随系统深色模式自动切换，无需手动设置。
+- 调色板按语义拆分：`values/colors.xml`（浅色）+ `values-night/colors.xml`（深色），
+  布局只引用语义色（`canvas_bg` / `panel_bg` / `text_primary` / `text_secondary` / `text_hint`）。
+- 浅色：浅灰画布 `#F2F3F7` + 白色面板；深色：`#141414` + `#1E1E1E`（保持原有深色观感）。
+- 状态栏 / 导航栏图标明暗跟随模式（`windowLightStatusBar` / `windowLightNavigationBar`）。
+- 正文、次要文字、提示文字的对比度均 ≥ 4.5:1（WCAG AA），由 `ThemeColorsTest` 回归校验。
+- 剪裁选框画在照片上，使用固定色（白框 + 深色描边），不随主题变化，白底 / 黑底照片上都清晰。
+
 ## 压缩策略（恒定压缩率）
 
 保存时**保持原格式**（按文件头魔数嗅探：JPEG / PNG / WebP / HEIF），并保证**体积与像素同比例收敛**：
@@ -61,6 +71,10 @@
 - `ImageEncoderPipelineTest`：Robolectric 跑真实 skia 解码/缩放/编码管线，
   用 `test_img/` 内的样例做端到端体积验证（50% 缩放后输出必须小于原图）。
   样例缺失时自动跳过；首次运行会经阿里云镜像下载 android-all 运行时。
+- `ThemeColorsTest`：浅色 / 深色两套资源解析、布局取色、状态栏图标明暗，
+  以及正文对比度（WCAG AA ≥ 4.5:1）的回归测试。
+- `ThemeScreenshotTest`：Robolectric 原生图形渲染主界面，浅色 / 深色截图输出到
+  `app/build/reports/screenshots/`，没有模拟器时也能核对配色。
 
 ## Release 构建
 

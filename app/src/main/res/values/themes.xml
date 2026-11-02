@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.ImageTool" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <!--
+        浅色与深色共用的主题定义；只有“状态栏/导航栏图标明暗”等模式相关属性
+        放在 values-night/themes.xml 里覆盖，避免两份主题定义漂移。
+    -->
+    <style name="Base.Theme.ImageTool" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primary_dark</item>
         <item name="colorAccent">@color/primary</item>
         <item name="android:windowBackground">@color/canvas_bg</item>
+        <item name="android:statusBarColor">@color/canvas_bg</item>
+        <item name="android:navigationBarColor">@color/panel_bg</item>
+    </style>
+
+    <!-- 浅色：系统栏用深色图标 -->
+    <style name="Theme.ImageTool" parent="Base.Theme.ImageTool">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

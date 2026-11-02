@@ -9,6 +9,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import androidx.core.content.ContextCompat
 import kotlin.math.max
 import kotlin.math.min
 
@@ -43,23 +44,38 @@ class CropOverlayView @JvmOverloads constructor(
     private val minSizePx = density * 48f
     private val cornerLenPx = density * 22f
 
+    // 覆盖层画在照片上而不是应用背景上，因此这组颜色不随深浅色主题变化，
+    // 但统一走资源，便于以后调整。
     private val dimPaint = Paint().apply {
-        color = 0xB3000000.toInt()
+        color = ContextCompat.getColor(context, R.color.crop_dim)
         style = Paint.Style.FILL
     }
+
+    /** 白框下面垫一层深色描边，白底照片上也能看清选框。 */
+    private val frameShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ContextCompat.getColor(context, R.color.crop_frame_shadow)
+        style = Paint.Style.STROKE
+        strokeWidth = density * 4f
+    }
     private val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFFFFFF.toInt()
+        color = ContextCompat.getColor(context, R.color.crop_frame)
         style = Paint.Style.STROKE
         strokeWidth = density * 1.5f
     }
+    private val cornerShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ContextCompat.getColor(context, R.color.crop_frame_shadow)
+        style = Paint.Style.STROKE
+        strokeWidth = density * 6f
+        strokeCap = Paint.Cap.ROUND
+    }
     private val cornerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFFFFFF.toInt()
+        color = ContextCompat.getColor(context, R.color.crop_frame)
         style = Paint.Style.STROKE
         strokeWidth = density * 3f
         strokeCap = Paint.Cap.ROUND
     }
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x59FFFFFF
+        color = ContextCompat.getColor(context, R.color.crop_grid)
         style = Paint.Style.STROKE
         strokeWidth = density * 0.75f
     }
@@ -97,7 +113,8 @@ class CropOverlayView @JvmOverloads constructor(
         canvas.drawLine(c.left + c.width() * 2f / 3f, c.top, c.left + c.width() * 2f / 3f, c.bottom, gridPaint)
         canvas.drawLine(c.left, c.top + c.height() / 3f, c.right, c.top + c.height() / 3f, gridPaint)
         canvas.drawLine(c.left, c.top + c.height() * 2f / 3f, c.right, c.top + c.height() * 2f / 3f, gridPaint)
-        // 边框与四角手柄
+        // 边框与四角手柄（先深色描边，再叠白线）
+        canvas.drawRect(c, frameShadowPaint)
         canvas.drawRect(c, framePaint)
         drawCorner(canvas, c, left = true, top = true)
         drawCorner(canvas, c, left = false, top = true)
@@ -106,12 +123,23 @@ class CropOverlayView @JvmOverloads constructor(
     }
 
     private fun drawCorner(canvas: Canvas, c: RectF, left: Boolean, top: Boolean) {
+        drawCornerEdges(canvas, c, left, top, cornerShadowPaint)
+        drawCornerEdges(canvas, c, left, top, cornerPaint)
+    }
+
+    private fun drawCornerEdges(
+        canvas: Canvas,
+        c: RectF,
+        left: Boolean,
+        top: Boolean,
+        paint: Paint,
+    ) {
         val x = if (left) c.left else c.right
         val y = if (top) c.top else c.bottom
         val dx = if (left) cornerLenPx else -cornerLenPx
         val dy = if (top) cornerLenPx else -cornerLenPx
-        canvas.drawLine(x, y, x + dx, y, cornerPaint)
-        canvas.drawLine(x, y, x, y + dy, cornerPaint)
+        canvas.drawLine(x, y, x + dx, y, paint)
+        canvas.drawLine(x, y, x, y + dy, paint)
     }
 
     private fun pixelRect(): RectF = RectF(
