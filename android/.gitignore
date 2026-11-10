@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+
+# Android
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Release signing（签名密钥与密码，勿入库，务必备份）
+keystore.properties
+*.jks
+
+# macOS
+.DS_Store

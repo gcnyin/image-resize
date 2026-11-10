@@ -1,23 +1,33 @@
-# Gradle
+# ---------- 通用 ----------
+.DS_Store
+*.log
+
+# ---------- Android（android/） ----------
 .gradle/
 build/
-
-# IDE
-.idea/
-*.iml
-
-# Android
+.kotlin/
 local.properties
 captures/
 .externalNativeBuild/
 .cxx/
-
-# Release signing（签名密钥与密码，勿入库，务必备份）
+.idea/
+*.iml
+# Release 签名（密钥与密码，勿入库，务必备份）
 keystore.properties
 *.jks
 
-# macOS
-.DS_Store
+# ---------- Windows（windows/） ----------
+bin/
+obj/
+.vs/
+*.user
+*.suo
+AppPackages/
+*.aps
+*.binlog
+crash.log
 
-# Kotlin
-.kotlin/
+# ---------- macOS（macos/） ----------
+.build/
+.swiftpm/
+*.xcodeproj
