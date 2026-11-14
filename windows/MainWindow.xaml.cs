@@ -35,6 +35,22 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         Title = "图片工具";
 
+        // 背景材质：Win11 用 Mica（跟随系统深浅色）；不支持的旧系统退回亚克力
+        if (Microsoft.UI.Composition.SystemBackdrops.MicaController.IsSupported())
+        {
+            SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
+        }
+        else if (Microsoft.UI.Composition.SystemBackdrops.DesktopAcrylicController.IsSupported())
+        {
+            SystemBackdrop = new Microsoft.UI.Xaml.Media.DesktopAcrylicBackdrop();
+        }
+
+        // 标题栏：内容延伸进标题栏，让 Mica 覆盖到窗口顶部；拖动区只放标题，不放交互控件
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        RootGrid.ActualThemeChanged += (_, _) => UpdateCaptionColors();
+        UpdateCaptionColors();
+
         // WinUI 运行时不接受 XAML 里的 IsChecked="True"（ToggleButton.IsChecked 赋值失败），在代码中设置
         ModeCrop.IsChecked = true;
         CropOverlay.CropChanged += _ => UpdateInfo();
@@ -79,6 +95,39 @@ public sealed partial class MainWindow : Window
         };
 
         UpdateModeUi();
+    }
+
+    /// <summary>自定义标题栏后，最小化/最大化/关闭按钮需透明底并手动跟随深浅色。</summary>
+    private void UpdateCaptionColors()
+    {
+        try
+        {
+            var bar = AppWindow.TitleBar;
+            bool dark = RootGrid.ActualTheme == ElementTheme.Dark;
+            var transparent = Microsoft.UI.Colors.Transparent;
+            var fg = dark
+                ? Microsoft.UI.ColorHelper.FromArgb(255, 255, 255, 255)
+                : Microsoft.UI.ColorHelper.FromArgb(255, 0, 0, 0);
+
+            bar.ButtonBackgroundColor = transparent;
+            bar.ButtonInactiveBackgroundColor = transparent;
+            bar.ButtonForegroundColor = fg;
+            bar.ButtonInactiveForegroundColor = dark
+                ? Microsoft.UI.ColorHelper.FromArgb(255, 0x8A, 0x8A, 0x8A)
+                : Microsoft.UI.ColorHelper.FromArgb(255, 0x5D, 0x5D, 0x5D);
+            bar.ButtonHoverForegroundColor = fg;
+            bar.ButtonHoverBackgroundColor = dark
+                ? Microsoft.UI.ColorHelper.FromArgb(0x24, 255, 255, 255)
+                : Microsoft.UI.ColorHelper.FromArgb(0x14, 0, 0, 0);
+            bar.ButtonPressedForegroundColor = fg;
+            bar.ButtonPressedBackgroundColor = dark
+                ? Microsoft.UI.ColorHelper.FromArgb(0x14, 255, 255, 255)
+                : Microsoft.UI.ColorHelper.FromArgb(0x0A, 0, 0, 0);
+        }
+        catch
+        {
+            // 少数系统版本不支持标题栏配色定制，保持系统默认即可
+        }
     }
 
     // ---------------------------------------------------------------- 加载
@@ -362,7 +411,7 @@ public sealed partial class MainWindow : Window
             Rect n = CropOverlay.CropRectNorm;
             int cw = Math.Max(1, (int)Math.Round(n.Width * bmp.Width));
             int ch = Math.Max(1, (int)Math.Round(n.Height * bmp.Height));
-            InfoText.Text = $"当前 {bmp.Width}×{bmp.Height} · 剪裁区域 {cw}×{ch}" +
+            InfoText.Text = $"{bmp.Width}×{bmp.Height} · 选区 {cw}×{ch}" +
                             $" · 原图 {img.SourceWidth}×{img.SourceHeight} {label}";
         }
         else
@@ -370,7 +419,7 @@ public sealed partial class MainWindow : Window
             int p = (int)PercentSlider.Value;
             int tw = ImageMath.TargetSize(bmp.Width, p);
             int th = ImageMath.TargetSize(bmp.Height, p);
-            InfoText.Text = $"比例 {p}%：{bmp.Width}×{bmp.Height} → {tw}×{th}" +
+            InfoText.Text = $"{p}%：{bmp.Width}×{bmp.Height} → {tw}×{th}" +
                             $" · 原图 {img.SourceWidth}×{img.SourceHeight} {label}";
         }
     }

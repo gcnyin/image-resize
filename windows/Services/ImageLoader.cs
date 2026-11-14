@@ -11,7 +11,7 @@ public static class ImageLoader
 
     public static LoadedImage Load(string path, int maxDim = MaxWorkDim)
     {
-        var (kind, header) = ImageFormat.Detect(path);
+        var (kind, _) = ImageFormat.Detect(path);
         var fileBytes = new FileInfo(path).Length;
 
         using var codec = SKCodec.Create(path) ?? throw new InvalidOperationException("无法解析图片");
@@ -38,7 +38,7 @@ public static class ImageLoader
         return new LoadedImage(
             Bitmap: bitmap,
             Format: kind,
-            WebpLossless: kind == ImageFormatKind.Webp && ImageFormat.IsWebpLossless(header),
+            WebpLossless: kind == ImageFormatKind.Webp && ImageFormat.IsWebpLossless(path),
             SourceWidth: sourceWidth,
             SourceHeight: sourceHeight,
             SourceFileBytes: fileBytes);

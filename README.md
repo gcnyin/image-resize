@@ -53,3 +53,15 @@ image-resize/
 ├── macos/       # macOS 工程（Swift Package，含 Vendor/libwebp 与测试）
 └── README.md
 ```
+
+## 已知问题
+
+- **WebP 无损标记识别（Android / macOS 待修）**
+  `VP8L` 是 WebP 的"无损"标记。ICCP / EXIF / XMP 等元数据块长度不固定，会把 `VP8L` 推到偏移 12 / 30 之外；
+  Android / macOS 目前只检查这两个固定位置（且只读了 48 字节文件头），这类文件会被误判为有损 WebP ——
+  信息栏只显示 `WebP`，保存时按有损重编码，画质与体积都会变差。
+  - Windows：已修复。改为按 RIFF 结构遍历 chunk（`windows/Services/ImageFormat.cs`），跳过元数据块，
+    并支持动图 `ANMF` 帧内的 `VP8` / `VP8L` 判定。
+  - Android：`android/app/src/main/kotlin/com/gcnyin/imagetool/ImageFormat.kt` → `isWebpLossless`
+  - macOS：`macos/Sources/ImageResize/Services/ImageFormat.swift` → `isWebpLossless`
+    （`macos/Tests` 里按 12 / 30 写的两条断言也要一起改）

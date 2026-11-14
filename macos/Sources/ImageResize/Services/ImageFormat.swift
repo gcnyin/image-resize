@@ -37,6 +37,11 @@ enum ImageFormat {
     }
 
     /// WebP 是否为无损（存在 VP8L chunk）：简单 WebP 的 chunk 在偏移 12，扩展 WebP（VP8X 头之后）约 30。
+    ///
+    /// TODO(webp-lossless): 这里只看固定偏移 12 / 30，且只读了 48 字节头。ICCP / EXIF / XMP 等元数据块
+    /// 长度不固定，会把 VP8L 推到偏移之外，这类无损 WebP 会被误判为有损（信息栏只显示 WebP，
+    /// 保存时按有损重编码）。Windows 端已改为按 RIFF 结构遍历 chunk（windows/Services/ImageFormat.cs），
+    /// 这边需要同样处理（改为流式遍历 + 动图 ANMF 帧判定），Tests 里 12 / 30 的两条断言也要一起改。
     static func isWebpLossless(_ header: [UInt8]) -> Bool {
         func vp8l(_ h: [UInt8], at offset: Int) -> Bool {
             guard offset + 4 <= h.count else { return false }

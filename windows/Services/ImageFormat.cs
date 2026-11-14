@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+
 namespace ImageResize.Services;
 
 public enum ImageFormatKind
@@ -39,13 +41,56 @@ public static class ImageFormat
         return ImageFormatKind.Unknown;
     }
 
-    /// <summary>WebP 是否为无损（存在 VP8L chunk）：简单 WebP 的 chunk 在偏移 12，扩展 WebP（VP8X 头之后）约 30。</summary>
-    public static bool IsWebpLossless(ReadOnlySpan<byte> header)
+    /// <summary>
+    /// WebP 是否为无损：按 RIFF 结构逐个 chunk 遍历，用第一个图像数据块（VP8L / VP8）判定。
+    /// 不能只看固定偏移——ICCP / EXIF / XMP 等元数据块的长度不固定，会把 VP8L 推到任意位置。
+    /// </summary>
+    public static bool IsWebpLossless(string path)
     {
-        static bool Vp8l(ReadOnlySpan<byte> h, int offset) =>
-            offset + 4 <= h.Length &&
-            h[offset] == 0x56 && h[offset + 1] == 0x50 && h[offset + 2] == 0x38 && h[offset + 3] == 0x4C;
-        return Vp8l(header, 12) || Vp8l(header, 30);
+        try
+        {
+            using var fs = File.OpenRead(path);
+            long length = fs.Length;
+
+            var head = new byte[12];
+            if (fs.ReadAtLeast(head, head.Length, throwOnEndOfStream: false) < head.Length) return false;
+            if (!(head[0] == (byte)'R' && head[1] == (byte)'I' && head[2] == (byte)'F' && head[3] == (byte)'F' &&
+                  head[8] == (byte)'W' && head[9] == (byte)'E' && head[10] == (byte)'B' && head[11] == (byte)'P'))
+            {
+                return false;
+            }
+
+            var chunk = new byte[8];
+            while (fs.Position + chunk.Length <= length)
+            {
+                if (fs.ReadAtLeast(chunk, chunk.Length, throwOnEndOfStream: false) < chunk.Length) return false;
+                var fourcc = new ReadOnlySpan<byte>(chunk, 0, 4);
+                long size = BinaryPrimitives.ReadUInt32LittleEndian(chunk.AsSpan(4, 4));
+
+                if (fourcc.SequenceEqual("VP8L"u8)) return true;   // 无损图像数据
+                if (fourcc.SequenceEqual("VP8 "u8)) return false;  // 有损图像数据
+
+                if (fourcc.SequenceEqual("ANMF"u8))
+                {
+                    // 动图：帧内前 16 字节是帧头，之后才是该帧的图像数据块
+                    var frame = new byte[20];
+                    if (fs.ReadAtLeast(frame, frame.Length, throwOnEndOfStream: false) < frame.Length) return false;
+                    return frame.AsSpan(16, 4).SequenceEqual("VP8L"u8);
+                }
+
+                // 其余是元数据/容器块（VP8X / ICCP / EXIF / XMP / ALPH / ANIM …），整块跳过；RIFF 块按偶数字节对齐
+                long skip = size + (size & 1);
+                if (fs.Position + skip > length) return false;
+                fs.Seek(skip, SeekOrigin.Current);
+            }
+
+            return false;
+        }
+        catch (IOException)
+        {
+            // 读失败时按有损处理：保存走有损编码，结果不会比误当无损更糟
+            return false;
+        }
     }
 
     /// <summary>探测文件的格式：先魔数嗅探，UNKNOWN 时按扩展名兜底。返回格式与读取到的文件头。</summary>

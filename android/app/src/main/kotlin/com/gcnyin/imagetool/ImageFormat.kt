@@ -42,7 +42,14 @@ object ImageFormat {
         }
     }
 
-    /** WebP 是否为无损（存在 VP8L chunk）。无损源保存时保持无损编码。 */
+    /**
+     * WebP 是否为无损（存在 VP8L chunk）。无损源保存时保持无损编码。
+     *
+     * TODO(webp-lossless): 这里只看固定偏移 12 / 30，且只读了 48 字节头。ICCP / EXIF / XMP 等元数据块
+     * 长度不固定，会把 VP8L 推到偏移之外，这类无损 WebP 会被误判为有损（信息栏只显示 WebP，
+     * 保存时按有损重编码）。Windows 端已改为按 RIFF 结构遍历 chunk（windows/Services/ImageFormat.cs），
+     * 这边需要同样处理（改为流式遍历 + 动图 ANMF 帧判定）。
+     */
     fun isWebpLossless(header: ByteArray): Boolean {
         fun vp8l(offset: Int): Boolean =
             offset + 4 <= header.size &&
