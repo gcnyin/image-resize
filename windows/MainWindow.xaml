@@ -39,7 +39,7 @@
             </StackPanel>
         </Grid>
 
-        <!-- 画布：图片 + 裁剪覆盖层 + 空态提示 + 忙碌指示 -->
+        <!-- 画布：图片 + 裁剪覆盖层 + 空态提示 + 忙碌指示 + 成功小字（覆盖层） -->
         <Grid x:Name="CanvasHost" Grid.Row="1" Margin="16,8,16,8"
               Background="{ThemeResource CanvasBrush}"
               AllowDrop="True"
@@ -54,6 +54,17 @@
             <ProgressRing x:Name="BusyRing" Width="48" Height="48"
                           HorizontalAlignment="Center" VerticalAlignment="Center"
                           IsActive="False" Visibility="Collapsed"/>
+            <!-- 成功反馈：一行小字覆盖层，不参与布局，避免顶起底部面板 -->
+            <Border x:Name="SuccessToast"
+                    HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                    Margin="0,0,0,10" Padding="10,4" CornerRadius="8"
+                    Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    IsHitTestVisible="False" Visibility="Collapsed">
+                <TextBlock x:Name="ToastText" FontSize="12"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+            </Border>
         </Grid>
 
         <!-- 底部面板：反馈 / 信息行 / 模式与操作 -->

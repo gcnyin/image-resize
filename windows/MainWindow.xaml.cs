@@ -1,6 +1,7 @@
 using ImageResize.Controls;
 using ImageResize.Models;
 using ImageResize.Services;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -26,6 +27,9 @@ public sealed partial class MainWindow : Window
     private string? _sourcePath;
     private bool _busy;
 
+    /// <summary>成功小字的自动消失计时器（全局唯一：重显消息时先 Stop 再重启，避免叠加多个计时器）。</summary>
+    private DispatcherQueueTimer? _toastTimer;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -35,13 +39,24 @@ public sealed partial class MainWindow : Window
         ModeCrop.IsChecked = true;
         CropOverlay.CropChanged += _ => UpdateInfo();
 
-        // AppWindow.Resize 用物理像素，需按显示缩放换算；在内容加载后取实际缩放比
+        // AppWindow 尺寸/坐标用物理像素，需按显示缩放换算；在内容加载后取实际缩放比并居中
         ((FrameworkElement)Content).Loaded += async (_, _) =>
         {
             try
             {
                 double scale = ((FrameworkElement)Content).XamlRoot.RasterizationScale;
-                AppWindow.Resize(new SizeInt32((int)(1100 * scale), (int)(760 * scale)));
+                int width = (int)(1100 * scale);
+                int height = (int)(760 * scale);
+                var area = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(
+                    AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Nearest);
+                var work = area.WorkArea;
+                width = Math.Min(width, work.Width);
+                height = Math.Min(height, work.Height);
+                AppWindow.MoveAndResize(new RectInt32(
+                    work.X + (work.Width - width) / 2,
+                    work.Y + (work.Height - height) / 2,
+                    width,
+                    height));
                 if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
                 {
                     presenter.PreferredMinimumWidth = (int)(860 * scale);
@@ -102,7 +117,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowFeedback($"加载失败：{ex.Message}", InfoBarSeverity.Error, autoClose: false);
+            ShowFeedback($"加载失败：{ex.Message}", InfoBarSeverity.Error);
             UpdateInfo();
         }
         finally
@@ -156,7 +171,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowFeedback($"{name}失败：{ex.Message}", InfoBarSeverity.Error, autoClose: false);
+            ShowFeedback($"{name}失败：{ex.Message}", InfoBarSeverity.Error);
         }
         finally
         {
@@ -203,7 +218,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowFeedback($"保存失败：{ex.Message}", InfoBarSeverity.Error, autoClose: false);
+            ShowFeedback($"保存失败：{ex.Message}", InfoBarSeverity.Error);
         }
         finally
         {
@@ -369,21 +384,45 @@ public sealed partial class MainWindow : Window
         _ => "JPEG",
     };
 
-    private void ShowFeedback(string message, InfoBarSeverity severity, bool autoClose = true)
+    /// <summary>
+    /// 显示反馈。错误沿用底部 InfoBar（红色、可换行、不自动关闭，直到下次加载/隐藏）；
+    /// 其余（成功/提示）用画布底部一行小字覆盖层呈现，约 2 秒后自动消失，不参与布局。
+    /// </summary>
+    private void ShowFeedback(string message, InfoBarSeverity severity)
     {
-        Feedback.Severity = severity;
-        Feedback.Message = message;
-        Feedback.IsOpen = true;
-        if (!autoClose) return;
-        var timer = DispatcherQueue.CreateTimer();
-        timer.Interval = TimeSpan.FromSeconds(4);
-        timer.IsRepeating = false;
-        timer.Tick += (_, _) =>
+        if (severity == InfoBarSeverity.Error)
         {
-            if (Feedback.Message == message) Feedback.IsOpen = false;
-        };
-        timer.Start();
+            HideToast();
+            Feedback.Severity = severity;
+            Feedback.Message = message;
+            Feedback.IsOpen = true;
+            return;
+        }
+
+        // 成功/提示：一行小字覆盖在画布底部，新消息替换旧消息并重置计时
+        Feedback.IsOpen = false;
+        ToastText.Text = message;
+        SuccessToast.Visibility = Visibility.Visible;
+        if (_toastTimer == null)
+        {
+            _toastTimer = DispatcherQueue.CreateTimer();
+            _toastTimer.IsRepeating = false;
+            _toastTimer.Tick += (_, _) => SuccessToast.Visibility = Visibility.Collapsed;
+        }
+        _toastTimer.Stop();
+        _toastTimer.Interval = TimeSpan.FromSeconds(2);
+        _toastTimer.Start();
     }
 
-    private void HideFeedback() => Feedback.IsOpen = false;
+    private void HideToast()
+    {
+        _toastTimer?.Stop();
+        SuccessToast.Visibility = Visibility.Collapsed;
+    }
+
+    private void HideFeedback()
+    {
+        HideToast();
+        Feedback.IsOpen = false;
+    }
 }
