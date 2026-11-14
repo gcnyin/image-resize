@@ -6,4 +6,3 @@ obj/
 AppPackages/
 *.aps
 *.binlog
-crash.log

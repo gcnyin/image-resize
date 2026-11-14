@@ -15,20 +15,20 @@ Windows 桌面图片小工具（WinUI 3 + .NET），支持**裁剪**与**按百�
 ## 构建 / 运行
 
 ```sh
-dotnet build ImageResize.csproj -c Debug -p Platform=x64
+dotnet build ImageResize.csproj -c Debug
 bin\x64\Debug\net10.0-windows10.0.19041.0\ImageResize.exe [可选图片路径]
 ```
 
 - 自包含部署（`WindowsAppSDKSelfContained=true`），无需安装 Windows App SDK 运行时。
 - 单工程无解决方案文件，VS 直接打开 `ImageResize.csproj` 选 x64 平台即可。
-- `-p Platform=x64` 必需：CLI 直接构建 csproj 时默认 AnyCPU，自包含目标会报架构错误。
+- 工程默认平台为 x64，直接 `dotnet build` 即可；也可显式传 `-p Platform=x64`。
 
 ## 打包发布
 
 ### Release 目录包（自包含，免安装运行时）
 
 ```sh
-dotnet publish ImageResize.csproj -c Release -p Platform=x64
+dotnet publish ImageResize.csproj -c Release
 ```
 
 产物：`bin\x64\Release\net10.0-windows10.0.19041.0\publish\`。
@@ -37,7 +37,7 @@ dotnet publish ImageResize.csproj -c Release -p Platform=x64
 ### 打包单一 exe 文件
 
 ```sh
-dotnet publish ImageResize.csproj -c Release -r win-x64 -p Platform=x64 ^
+dotnet publish ImageResize.csproj -c Release -r win-x64 ^
   -p PublishSingleFile=true ^
   -p IncludeNativeLibrariesForSelfExtract=true ^
   -p EnableCompressionInSingleFile=true
