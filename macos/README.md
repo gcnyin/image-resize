@@ -40,7 +40,7 @@ swift build
 swift test
 ```
 
-覆盖：魔数嗅探、WebP 无损位探测、目标尺寸（.5 靠偶数，与 .NET `MathF.Round` 一致）、质量二分、缩放/裁剪尺寸、大图上限降采样、JPEG 恒定压缩率、PNG 无损回路、HEIC 保留、无损 WebP 逐像素一致、有损 WebP 恒定压缩率。
+覆盖：魔数嗅探、WebP 无损判定（RIFF 遍历，含元数据块后与动图帧）、目标尺寸（.5 靠偶数，与 .NET `MathF.Round` 一致）、质量二分、缩放/裁剪尺寸、大图上限降采样、JPEG 恒定压缩率、PNG 无损回路、HEIC 保留、无损 WebP 逐像素一致、有损 WebP 恒定压缩率。
 
 ## 打包发布
 

@@ -59,16 +59,64 @@ final class ImageResizeTests: XCTestCase {
     }
 
     func testWebpLosslessDetection() {
-        func withChunk(_ offset: Int, bytes: [UInt8], in header: [UInt8]) -> [UInt8] {
-            var h = header
-            h.replaceSubrange(offset..<offset + 4, with: bytes)
-            return h
+        // 按 RIFF 结构合成的 WebP：chunk = 四字符码 + 小端长度 + 载荷（奇数长度补 1 字节对齐）
+        func chunk(_ fourcc: String, _ payload: [UInt8]) -> [UInt8] {
+            let size = UInt32(payload.count)
+            var out = Array(fourcc.utf8)
+            out += [
+                UInt8(size & 0xFF), UInt8((size >> 8) & 0xFF),
+                UInt8((size >> 16) & 0xFF), UInt8((size >> 24) & 0xFF),
+            ]
+            out += payload
+            if payload.count % 2 == 1 { out.append(0) }
+            return out
         }
-        let base = [UInt8](repeating: 0, count: 48)
-        let vp8l: [UInt8] = [0x56, 0x50, 0x38, 0x4C]
-        XCTAssertTrue(ImageFormat.isWebpLossless(withChunk(12, bytes: vp8l, in: base)))
-        XCTAssertTrue(ImageFormat.isWebpLossless(withChunk(30, bytes: vp8l, in: base)))
-        XCTAssertFalse(ImageFormat.isWebpLossless(base))
+        func webp(_ chunks: [(String, [UInt8])]) -> [UInt8] {
+            var body: [UInt8] = []
+            for (fourcc, payload) in chunks { body += chunk(fourcc, payload) }
+            let riffSize = UInt32(body.count + 4)
+            var out = Array("RIFF".utf8)
+            out += [
+                UInt8(riffSize & 0xFF), UInt8((riffSize >> 8) & 0xFF),
+                UInt8((riffSize >> 16) & 0xFF), UInt8((riffSize >> 24) & 0xFF),
+            ]
+            out += Array("WEBP".utf8)
+            return out + body
+        }
+        func lossless(_ bytes: [UInt8]) -> Bool {
+            let url = tempFile(name: "detect-\(UUID().uuidString).webp")
+            try? Data(bytes).write(to: url)
+            defer { try? FileManager.default.removeItem(at: url) }
+            return ImageFormat.isWebpLossless(path: url.path)
+        }
+        func frame(_ inner: String) -> [UInt8] {
+            [UInt8](repeating: 0, count: 16) + chunk(inner, [0, 1, 2, 3])
+        }
+
+        XCTAssertTrue(lossless(webp([("VP8L", [UInt8](repeating: 0x2F, count: 8))])))
+        XCTAssertFalse(lossless(webp([("VP8 ", [UInt8](repeating: 0x30, count: 8))])))
+        // ICCP / EXIF 长度不固定（这里 ICCP 还是奇数长度），VP8L 被推离偏移 12 / 30
+        XCTAssertTrue(lossless(webp([
+            ("VP8X", [UInt8](repeating: 0, count: 10)),
+            ("ICCP", [UInt8](repeating: 0x11, count: 5)),
+            ("EXIF", [1, 2, 3, 4]),
+            ("VP8L", [UInt8](repeating: 0x2F, count: 6)),
+        ])))
+        // 动图：看 ANMF 帧内首个数据块
+        XCTAssertTrue(lossless(webp([
+            ("VP8X", [UInt8](repeating: 0, count: 10)),
+            ("ANIM", [UInt8](repeating: 0, count: 6)),
+            ("ANMF", frame("VP8L")),
+        ])))
+        XCTAssertFalse(lossless(webp([
+            ("VP8X", [UInt8](repeating: 0, count: 10)),
+            ("ANIM", [UInt8](repeating: 0, count: 6)),
+            ("ANMF", frame("VP8 ")),
+        ])))
+        // 非 WebP / 空 / 截断：不崩，按有损处理
+        XCTAssertFalse(lossless([0xFF, 0xD8, 0xFF, 0xE0]))
+        XCTAssertFalse(lossless([]))
+        XCTAssertFalse(lossless(Array(webp([("VP8 ", [0, 1, 2, 3])]).prefix(16))))
     }
 
     // ---------------------------------------------------------------- ImageMath

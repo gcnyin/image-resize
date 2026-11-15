@@ -50,7 +50,7 @@ class ImageEncoderPipelineTest {
                 kind,
                 srcBytes,
                 src.width.toLong() * src.height,
-                kind == ImageFormat.Kind.WEBP && ImageFormat.isWebpLossless(header),
+                kind == ImageFormat.Kind.WEBP && f.inputStream().use { ImageFormat.isWebpLossless(it) },
             )
             val ratio = String.format(Locale.US, "%.1f%%", enc.bytes.size * 100.0 / srcBytes)
             println(

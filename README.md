@@ -54,14 +54,12 @@ image-resize/
 └── README.md
 ```
 
-## 已知问题
+## WebP 无损识别
 
-- **WebP 无损标记识别（Android / macOS 待修）**
-  `VP8L` 是 WebP 的"无损"标记。ICCP / EXIF / XMP 等元数据块长度不固定，会把 `VP8L` 推到偏移 12 / 30 之外；
-  Android / macOS 目前只检查这两个固定位置（且只读了 48 字节文件头），这类文件会被误判为有损 WebP ——
-  信息栏只显示 `WebP`，保存时按有损重编码，画质与体积都会变差。
-  - Windows：已修复。改为按 RIFF 结构遍历 chunk（`windows/Services/ImageFormat.cs`），跳过元数据块，
-    并支持动图 `ANMF` 帧内的 `VP8` / `VP8L` 判定。
-  - Android：`android/app/src/main/kotlin/com/gcnyin/imagetool/ImageFormat.kt` → `isWebpLossless`
-  - macOS：`macos/Sources/ImageResize/Services/ImageFormat.swift` → `isWebpLossless`
-    （`macos/Tests` 里按 12 / 30 写的两条断言也要一起改）
+`VP8L` 是 WebP 的"无损"标记，但它不一定落在固定偏移：ICCP / EXIF / XMP 等元数据块长度不固定，
+会把 `VP8L` 推后。三端都改为按 RIFF 结构逐个 chunk 遍历，用**首个图像数据块**
+（`VP8L` / `VP8 `）判定，动图则看 `ANMF` 帧内的数据块；判定为无损的源保存时保持无损编码。
+
+- Windows：`windows/Services/ImageFormat.cs` → `IsWebpLossless`
+- Android：`android/app/src/main/kotlin/com/gcnyin/imagetool/ImageFormat.kt` → `isWebpLossless`
+- macOS：`macos/Sources/ImageResize/Services/ImageFormat.swift` → `isWebpLossless`

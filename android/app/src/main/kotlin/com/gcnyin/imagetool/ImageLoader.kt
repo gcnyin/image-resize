@@ -28,7 +28,7 @@ object ImageLoader {
 
     fun load(context: Context, uri: Uri): LoadedImage {
         val resolver = context.contentResolver
-        val (kind, header) = ImageFormat.detect(context, uri)
+        val (kind, _) = ImageFormat.detect(context, uri)
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         resolver.openInputStream(uri)!!.use {
@@ -71,7 +71,7 @@ object ImageLoader {
             sourceHeight = bounds.outHeight,
             sourceFileBytes = fileSize(resolver, uri),
             format = kind,
-            webpLossless = kind == ImageFormat.Kind.WEBP && ImageFormat.isWebpLossless(header),
+            webpLossless = kind == ImageFormat.Kind.WEBP && ImageFormat.isWebpLossless(resolver, uri),
         )
     }
 

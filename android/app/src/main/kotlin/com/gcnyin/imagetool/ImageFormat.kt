@@ -3,6 +3,8 @@ package com.gcnyin.imagetool
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import java.io.IOException
+import java.io.InputStream
 
 /** 图片格式识别（按文件头魔数），用于保存时保持原格式。 */
 object ImageFormat {
@@ -43,22 +45,74 @@ object ImageFormat {
     }
 
     /**
-     * WebP 是否为无损（存在 VP8L chunk）。无损源保存时保持无损编码。
+     * WebP 是否为无损（首个图像数据块是 VP8L）。无损源保存时保持无损编码。
      *
-     * TODO(webp-lossless): 这里只看固定偏移 12 / 30，且只读了 48 字节头。ICCP / EXIF / XMP 等元数据块
-     * 长度不固定，会把 VP8L 推到偏移之外，这类无损 WebP 会被误判为有损（信息栏只显示 WebP，
-     * 保存时按有损重编码）。Windows 端已改为按 RIFF 结构遍历 chunk（windows/Services/ImageFormat.cs），
-     * 这边需要同样处理（改为流式遍历 + 动图 ANMF 帧判定）。
+     * 按 RIFF 结构逐个 chunk 遍历，不能只看固定偏移：ICCP / EXIF / XMP 等元数据块长度不固定，
+     * 会把 VP8L 推到任意位置；动图还要看 ANMF 帧内的数据块。与 Windows 端实现保持一致
+     * （windows/Services/ImageFormat.cs → IsWebpLossless）。
      */
-    fun isWebpLossless(header: ByteArray): Boolean {
-        fun vp8l(offset: Int): Boolean =
-            offset + 4 <= header.size &&
-                header[offset] == 0x56.toByte() &&
-                header[offset + 1] == 0x50.toByte() &&
-                header[offset + 2] == 0x38.toByte() &&
-                header[offset + 3] == 0x4C.toByte()
-        // 简单 WebP：chunk 四字符码在偏移 12；扩展 WebP：VP8X 头之后（约 30）
-        return vp8l(12) || vp8l(30)
+    fun isWebpLossless(resolver: ContentResolver, uri: Uri): Boolean = try {
+        resolver.openInputStream(uri)?.use { isWebpLossless(it) } ?: false
+    } catch (_: IOException) {
+        // 读失败按有损处理：保存走有损编码，结果不会比误当无损更糟
+        false
+    }
+
+    /** 流式判定：只按 chunk 头前进，不把整个文件读进内存。 */
+    internal fun isWebpLossless(input: InputStream): Boolean {
+        fun readFully(buf: ByteArray): Boolean {
+            var off = 0
+            while (off < buf.size) {
+                val n = input.read(buf, off, buf.size - off)
+                if (n < 0) return false
+                off += n
+            }
+            return true
+        }
+
+        fun skipFully(count: Long): Boolean {
+            var left = count
+            val buf = ByteArray(8 * 1024)
+            while (left > 0) {
+                val skipped = input.skip(left)
+                if (skipped > 0) {
+                    left -= skipped
+                    continue
+                }
+                // skip 可能返回 0（如网络流），退回按块读
+                val n = input.read(buf, 0, minOf(buf.size.toLong(), left).toInt())
+                if (n < 0) return false
+                left -= n
+            }
+            return true
+        }
+
+        val head = ByteArray(12)
+        if (!readFully(head)) return false
+        if (String(head, 0, 4, Charsets.US_ASCII) != "RIFF") return false
+        if (String(head, 8, 4, Charsets.US_ASCII) != "WEBP") return false
+
+        val chunk = ByteArray(8)
+        while (readFully(chunk)) {
+            val fourcc = String(chunk, 0, 4, Charsets.US_ASCII)
+            val size = (chunk[4].toLong() and 0xFF) or
+                ((chunk[5].toLong() and 0xFF) shl 8) or
+                ((chunk[6].toLong() and 0xFF) shl 16) or
+                ((chunk[7].toLong() and 0xFF) shl 24)
+            when (fourcc) {
+                "VP8L" -> return true // 无损图像数据
+                "VP8 " -> return false // 有损图像数据
+                "ANMF" -> {
+                    // 动图帧：帧内前 16 字节是帧头，之后才是该帧的图像数据块
+                    val frame = ByteArray(20)
+                    if (!readFully(frame)) return false
+                    return String(frame, 16, 4, Charsets.US_ASCII) == "VP8L"
+                }
+            }
+            // 其余是元数据/容器块（VP8X / ICCP / EXIF / XMP / ALPH / ANIM …），整块跳过；RIFF 块按偶数字节对齐
+            if (!skipFully(size + (size and 1L))) return false
+        }
+        return false
     }
 
     /** 嗅探 Content Uri 的格式：文件头魔数优先，MIME 类型兜底。 */

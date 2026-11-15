@@ -36,18 +36,50 @@ enum ImageFormat {
         return .unknown
     }
 
-    /// WebP 是否为无损（存在 VP8L chunk）：简单 WebP 的 chunk 在偏移 12，扩展 WebP（VP8X 头之后）约 30。
+    /// WebP 是否为无损（首个图像数据块是 VP8L）。
     ///
-    /// TODO(webp-lossless): 这里只看固定偏移 12 / 30，且只读了 48 字节头。ICCP / EXIF / XMP 等元数据块
-    /// 长度不固定，会把 VP8L 推到偏移之外，这类无损 WebP 会被误判为有损（信息栏只显示 WebP，
-    /// 保存时按有损重编码）。Windows 端已改为按 RIFF 结构遍历 chunk（windows/Services/ImageFormat.cs），
-    /// 这边需要同样处理（改为流式遍历 + 动图 ANMF 帧判定），Tests 里 12 / 30 的两条断言也要一起改。
-    static func isWebpLossless(_ header: [UInt8]) -> Bool {
-        func vp8l(_ h: [UInt8], at offset: Int) -> Bool {
-            guard offset + 4 <= h.count else { return false }
-            return h[offset] == 0x56 && h[offset + 1] == 0x50 && h[offset + 2] == 0x38 && h[offset + 3] == 0x4C
+    /// 按 RIFF 结构逐个 chunk 遍历，不能只看固定偏移：ICCP / EXIF / XMP 等元数据块长度不固定，
+    /// 会把 VP8L 推到任意位置；动图还要看 ANMF 帧内的数据块。与 Windows 端实现一致
+    /// （windows/Services/ImageFormat.cs → IsWebpLossless）。
+    static func isWebpLossless(path: String) -> Bool {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return false }
+        defer { try? handle.close() }
+
+        func read(_ count: Int) -> [UInt8]? {
+            guard let data = try? handle.read(upToCount: count), data.count == count else { return nil }
+            return [UInt8](data)
         }
-        return vp8l(header, at: 12) || vp8l(header, at: 30)
+
+        guard let head = read(12),
+              head[0..<4].elementsEqual(Array("RIFF".utf8)),
+              head[8..<12].elementsEqual(Array("WEBP".utf8))
+        else { return false }
+
+        while let chunk = read(8) {
+            let fourcc = String(decoding: chunk[0..<4], as: UTF8.self)
+            let size = UInt32(chunk[4]) | UInt32(chunk[5]) << 8
+                | UInt32(chunk[6]) << 16 | UInt32(chunk[7]) << 24
+
+            switch fourcc {
+            case "VP8L":
+                return true // 无损图像数据
+            case "VP8 ":
+                return false // 有损图像数据
+            case "ANMF":
+                // 动图帧：帧内前 16 字节是帧头，之后才是该帧的图像数据块
+                guard let frame = read(20) else { return false }
+                return String(decoding: frame[16..<20], as: UTF8.self) == "VP8L"
+            default:
+                break
+            }
+
+            // 其余是元数据/容器块（VP8X / ICCP / EXIF / XMP / ALPH / ANIM …），整块跳过；RIFF 块按偶数字节对齐
+            let skip = UInt64(size) + UInt64(size & 1)
+            guard let position = try? handle.offset(),
+                  (try? handle.seek(toOffset: position + skip)) != nil
+            else { return false }
+        }
+        return false
     }
 
     /// 探测文件的格式：先魔数嗅探，UNKNOWN 时按扩展名兜底。返回格式与读取到的文件头。

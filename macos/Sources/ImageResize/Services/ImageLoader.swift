@@ -24,7 +24,7 @@ enum ImageLoader {
     static let maxWorkDim = 4096
 
     static func load(path: String, maxDim: Int = ImageLoader.maxWorkDim) throws -> LoadedImage {
-        let (kind, header) = ImageFormat.detect(path: path)
+        let (kind, _) = ImageFormat.detect(path: path)
         let fileBytes = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
 
         guard let url = CFURLCreateWithFileSystemPath(nil, path as CFString, .cfurlposixPathStyle, false),
@@ -54,7 +54,7 @@ enum ImageLoader {
         return LoadedImage(
             cgImage: cgImage,
             format: kind,
-            webpLossless: kind == .webp && ImageFormat.isWebpLossless(header),
+            webpLossless: kind == .webp && ImageFormat.isWebpLossless(path: path),
             sourceWidth: sourceWidth,
             sourceHeight: sourceHeight,
             sourceFileBytes: fileBytes
