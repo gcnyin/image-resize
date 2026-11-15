@@ -31,6 +31,10 @@ struct MainWindowView: View {
             canvas
             bottomPanel
         }
+        // 全窗材质（对应 Win 版 Mica），图片与面板都直接铺在它上面
+        .background(WindowMaterialBackground())
+        // fullSizeContentView 后内容延伸到标题栏：把 header 压到红绿灯下方
+        .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: 28) }
         .onAppear {
             if let path = initialPath, current == nil {
                 loadAsync(path)
@@ -59,7 +63,8 @@ struct MainWindowView: View {
         GeometryReader { geo in
             let fit = fittedRect(canvas: geo.size)
             ZStack {
-                Rectangle().fill(Color(nsColor: .canvasColor))
+                // 透明命中层：只用来接收拖放，不绘制任何底色（图片背后是窗口材质）
+                Color.clear.contentShape(Rectangle())
                 if let cg = current {
                     Image(decorative: cg, scale: 1)
                         .resizable()
@@ -115,7 +120,7 @@ struct MainWindowView: View {
             }
         }
         .padding(EdgeInsets(top: 10, leading: 16, bottom: 12, trailing: 16))
-        .background(Color(nsColor: .separatorColor).opacity(0.25))
+        .overlay(alignment: .top) { Divider() }
     }
 
     private var cropControls: some View {
@@ -320,16 +325,5 @@ extension MainWindowView.Severity {
         case .success: return .green
         case .error: return .red
         }
-    }
-}
-
-extension NSColor {
-    /// 画布底色：浅色 #F2F3F7，深色 #141414（保持参考应用的观感）。
-    static let canvasColor = NSColor(name: nil) { appearance in
-        let dark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        if dark {
-            return NSColor(srgbRed: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255, alpha: 1)
-        }
-        return NSColor(srgbRed: 0xF2 / 255, green: 0xF3 / 255, blue: 0xF7 / 255, alpha: 1)
     }
 }
