@@ -33,8 +33,15 @@ struct MainWindowView: View {
         }
         // 全窗材质（对应 Win 版 Mica），图片与面板都直接铺在它上面
         .background(WindowMaterialBackground())
+        // 提示条悬浮在窗口右下角（对应 Windows 系统通知），不参与布局
+        .overlay(alignment: .bottomTrailing) {
+            feedbackBanner
+                .fixedSize()
+                .padding(.bottom, 16)
+                .padding(.trailing, 16)
+        }
         // fullSizeContentView 后内容延伸到标题栏：把 header 压到红绿灯下方
-        .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: 28) }
+        .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: 6) }
         .onAppear {
             if let path = initialPath, current == nil {
                 loadAsync(path)
@@ -54,7 +61,7 @@ struct MainWindowView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(current == nil || busy)
         }
-        .padding(EdgeInsets(top: 10, leading: 16, bottom: 6, trailing: 16))
+        .padding(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
     }
 
     // ---------------------------------------------------------------- 画布
@@ -93,7 +100,6 @@ struct MainWindowView: View {
 
     private var bottomPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            feedbackBanner
             Text(infoText)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
@@ -155,11 +161,17 @@ struct MainWindowView: View {
             HStack(spacing: 6) {
                 Circle().fill(fb.severity.color).frame(width: 8, height: 8)
                 Text(fb.message).font(.system(size: 12))
-                Spacer()
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(fb.severity.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            // 宽度完全由文字撑开，不再固定比例或截断
+            .fixedSize(horizontal: true, vertical: false)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(fb.severity.color.opacity(0.35), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
             .transition(.opacity)
         }
     }

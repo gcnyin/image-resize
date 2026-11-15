@@ -17,5 +17,7 @@ struct ImageResizeApp: App {
         }
         .defaultSize(width: 1100, height: 760)
         .windowResizability(.contentMinSize)
+        // 隐藏原生标题栏：标题栏区域与内容区共用同一块窗口材质（无独立玻璃条）
+        .windowStyle(.hiddenTitleBar)
     }
 }
