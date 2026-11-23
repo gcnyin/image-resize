@@ -9,6 +9,9 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.gcnyin.imagetool.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applySystemBarInsets()
 
         binding.btnPick.setOnClickListener { pickImage.launch("image/*") }
         binding.btnSave.setOnClickListener { save() }
@@ -63,6 +67,36 @@ class MainActivity : AppCompatActivity() {
         binding.cropOverlay.onCropChanged = { updateInfo() }
 
         updateModeUi()
+    }
+
+    /**
+     * Android 15（API 35）起系统对 targetSdk>=35 强制 edge-to-edge，布局会一直铺到
+     * 状态栏 / 导航栏下面；这里自己把内容让开，避免照片顶部被状态栏压住、底部按钮被
+     * 导航栏盖住。低版本上窗口本来就会让开，拿到的是 0 inset，行为不变。
+     */
+    private fun applySystemBarInsets() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val panel = binding.panel
+        val panelPadding = intArrayOf(
+            panel.paddingLeft,
+            panel.paddingTop,
+            panel.paddingRight,
+            panel.paddingBottom,
+        )
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
+            )
+            // 画布避开顶部/侧边；底部留给面板自己撑出，让面板背景铺到导航栏下面。
+            view.setPadding(bars.left, bars.top, bars.right, 0)
+            panel.setPadding(
+                panelPadding[0],
+                panelPadding[1],
+                panelPadding[2],
+                panelPadding[3] + bars.bottom,
+            )
+            insets
+        }
     }
 
     // ---------------------------------------------------------------- 加载
