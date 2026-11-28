@@ -1,9 +1,13 @@
-// Package format 按文件头魔数识别图片格式（对齐 macos/Services/ImageFormat.swift）。
+// Package format detects image container formats from magic headers and file extensions.
 package format
 
-import "strings"
+import (
+	"bytes"
+	"path/filepath"
+	"strings"
+)
 
-type Kind int
+type Kind uint8
 
 const (
 	Unknown Kind = iota
@@ -13,54 +17,69 @@ const (
 	HEIF
 )
 
-var heifBrands = map[string]bool{
-	"heic": true, "heix": true, "hevc": true, "hevx": true,
-	"heim": true, "heis": true, "hevm": true, "hevs": true,
-	"mif1": true, "msf1": true,
+func (k Kind) String() string {
+	switch k {
+	case JPEG:
+		return "JPEG"
+	case PNG:
+		return "PNG"
+	case WebP:
+		return "WebP"
+	case HEIF:
+		return "HEIF"
+	default:
+		return "未知格式"
+	}
 }
 
-// Sniff 按文件头魔数判断格式。
+var heifBrands = map[string]struct{}{
+	"heic": {},
+	"heix": {},
+	"hevc": {},
+	"hevx": {},
+	"heim": {},
+	"heis": {},
+	"hevm": {},
+	"hevs": {},
+	"mif1": {},
+	"msf1": {},
+}
+
+// Sniff inspects magic bytes in header to identify the image format.
 func Sniff(header []byte) Kind {
 	if len(header) >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF {
 		return JPEG
 	}
-	if len(header) >= 8 &&
-		header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47 &&
-		header[4] == 0x0D && header[5] == 0x0A && header[6] == 0x1A && header[7] == 0x0A {
+	if len(header) >= 8 && bytes.Equal(header[:8], []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}) {
 		return PNG
 	}
-	if len(header) >= 12 &&
-		header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F' &&
-		header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P' {
+	if len(header) >= 12 && bytes.Equal(header[:4], []byte("RIFF")) && bytes.Equal(header[8:12], []byte("WEBP")) {
 		return WebP
 	}
-	if len(header) >= 12 &&
-		header[4] == 'f' && header[5] == 't' && header[6] == 'y' && header[7] == 'p' {
-		if heifBrands[string(header[8:12])] {
+	if len(header) >= 12 && bytes.Equal(header[4:8], []byte("ftyp")) {
+		if _, ok := heifBrands[string(header[8:12])]; ok {
 			return HEIF
 		}
+		return Unknown
 	}
 	return Unknown
 }
 
-// Detect 探测文件格式：先魔数嗅探，Unknown 时按扩展名兜底。
+// Detect identifies the format by sniffing header first, falling back to path extension.
 func Detect(path string, header []byte) Kind {
-	if k := Sniff(header); k != Unknown {
-		return k
+	if kind := Sniff(header); kind != Unknown {
+		return kind
 	}
-	dot := strings.LastIndexByte(path, '.')
-	if dot < 0 {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".jpg", ".jpeg":
+		return JPEG
+	case ".png":
+		return PNG
+	case ".webp":
+		return WebP
+	case ".heic", ".heif":
+		return HEIF
+	default:
 		return Unknown
 	}
-	switch strings.ToLower(path[dot+1:]) {
-	case "jpg", "jpeg":
-		return JPEG
-	case "png":
-		return PNG
-	case "webp":
-		return WebP
-	case "heic", "heif":
-		return HEIF
-	}
-	return Unknown
 }

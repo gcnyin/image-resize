@@ -3,55 +3,60 @@ package format
 import "testing"
 
 func TestSniff(t *testing.T) {
-	cases := []struct {
+	tests := []struct {
 		name   string
 		header []byte
 		want   Kind
 	}{
 		{"jpeg", []byte{0xFF, 0xD8, 0xFF, 0xE0}, JPEG},
-		{"png", []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}, PNG},
-		{"webp", append([]byte("RIFF"), append(make([]byte, 4), 'W', 'E', 'B', 'P')...), WebP},
+		{"png", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00}, PNG},
+		{"webp", []byte{'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P'}, WebP},
+		{"heif_heic", []byte("    ftypheic...."), HEIF},
+		{"heif_heix", []byte("    ftypheix...."), HEIF},
+		{"heif_hevc", []byte("    ftyphevc...."), HEIF},
+		{"heif_hevx", []byte("    ftyphevx...."), HEIF},
+		{"heif_heim", []byte("    ftypheim...."), HEIF},
+		{"heif_heis", []byte("    ftypheis...."), HEIF},
+		{"heif_hevm", []byte("    ftyphevm...."), HEIF},
+		{"heif_hevs", []byte("    ftyphevs...."), HEIF},
+		{"heif_mif1", []byte("    ftypmif1...."), HEIF},
+		{"heif_msf1", []byte("    ftypmsf1...."), HEIF},
+		{"non_heif_ftyp", []byte("    ftypmp42...."), Unknown},
+		{"short", []byte{0xFF, 0xD8}, Unknown},
 		{"empty", nil, Unknown},
-		{"text", []byte("hello world, definitely not an image"), Unknown},
 	}
-	for _, c := range cases {
-		if got := Sniff(c.header); got != c.want {
-			t.Errorf("%s: got %v want %v", c.name, got, c.want)
-		}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Sniff(tc.header); got != tc.want {
+				t.Fatalf("Sniff() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 
-func TestSniffHeifBrands(t *testing.T) {
-	for _, brand := range []string{"heic", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs", "mif1", "msf1"} {
-		header := append([]byte{0, 0, 0, 24, 'f', 't', 'y', 'p'}, brand...)
-		if got := Sniff(header); got != HEIF {
-			t.Errorf("brand %s: got %v want HEIF", brand, got)
-		}
-	}
-	// 非 HEIF 的 ftyp 品牌（如 isom/mp4）不算 HEIF。
-	if got := Sniff([]byte{0, 0, 0, 24, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm'}); got != Unknown {
-		t.Errorf("ftyp isom: got %v want Unknown", got)
-	}
-}
-
-func TestDetectExtensionFallback(t *testing.T) {
-	cases := []struct {
+func TestDetect(t *testing.T) {
+	tests := []struct {
+		name   string
 		path   string
 		header []byte
 		want   Kind
 	}{
-		{"a.jpg", []byte{0x00}, JPEG},
-		{"a.JPEG", []byte{0x00}, JPEG},
-		{"b.png", []byte{0x00}, PNG},
-		{"c.webp", []byte{0x00}, WebP},
-		{"d.heic", []byte{0x00}, HEIF},
-		{"e.txt", []byte{0x00}, Unknown},
-		{"noext", []byte{0x00}, Unknown},
-		{"magic.wins", []byte{0xFF, 0xD8, 0xFF, 0xE0}, JPEG},
+		{"magic_overrides_ext", "photo.png", []byte{0xFF, 0xD8, 0xFF, 0xE1}, JPEG},
+		{"fallback_jpg", "photo.JPG", nil, JPEG},
+		{"fallback_jpeg", "photo.jpeg", nil, JPEG},
+		{"fallback_png", "photo.png", []byte{1, 2, 3}, PNG},
+		{"fallback_webp", "photo.webp", nil, WebP},
+		{"fallback_heic", "photo.heic", nil, HEIF},
+		{"fallback_heif", "photo.HEIF", nil, HEIF},
+		{"unknown", "photo.bmp", nil, Unknown},
 	}
-	for _, c := range cases {
-		if got := Detect(c.path, c.header); got != c.want {
-			t.Errorf("%s: got %v want %v", c.path, got, c.want)
-		}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Detect(tc.path, tc.header); got != tc.want {
+				t.Fatalf("Detect(%q) = %v, want %v", tc.path, got, tc.want)
+			}
+		})
 	}
 }

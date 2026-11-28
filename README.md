@@ -8,7 +8,7 @@
 | [`android/`](android/) | Android 10+ | Kotlin + AppCompat（Gradle） |
 | [`windows/`](windows/) | Windows 10/11 | WinUI 3 + .NET 10 + SkiaSharp |
 | [`macos/`](macos/) | macOS 13+ | SwiftUI + Image I/O + vendor libwebp |
-| [`cli/`](cli/) | 跨平台命令行 | Go 标准库（仅压缩：JPEG/PNG） |
+| [`cli/`](cli/) | 跨平台命令行 | Go 标准库（仅缩放：JPEG/PNG） |
 
 ## 共同功能
 
@@ -43,7 +43,7 @@ cd windows && dotnet build ImageResize.csproj -c Debug -p Platform=x64
 cd macos && swift build
 
 # CLI（任意平台）
-cd cli && go build -o imgcompr .
+cd cli && go build -o imgresize .
 ```
 
 各平台的详细说明（测试、打包、签名、发布）见对应目录的 README。
@@ -55,7 +55,7 @@ image-resize/
 ├── android/     # Android 工程（Gradle 根目录，含 app 模块与 test_img 样例）
 ├── windows/     # Windows 工程（单 csproj，含 samples 样例）
 ├── macos/       # macOS 工程（Swift Package，含 Vendor/libwebp 与测试）
-├── cli/         # Go 命令行工程（仅压缩）
+├── cli/         # Go 命令行工程（仅缩放，无裁剪）
 └── README.md
 ```
 

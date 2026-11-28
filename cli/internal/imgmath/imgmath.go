@@ -1,14 +1,49 @@
-// Package imgmath 质量二分搜索（对齐 macos/Services/ImageMath.swift 的 solveQuality）。
+// Package imgmath provides pure dimension, target-size, and quality-search math.
 package imgmath
 
-// SolveQuality 在 [minQuality, maxQuality] 内二分搜索不超过 targetBytes 的最大质量。
-// encode 必须是关于质量的单调（非严格）递增的字节数函数。
-// 全部超目标时返回 minQuality，全部达标时返回 maxQuality。
+import "math"
+
+// MinTargetBytes prevents target byte budgets from collapsing on tiny images.
+const MinTargetBytes int64 = 4096
+
+// TargetSize scales original by percent using round-to-even with a 1px floor,
+// matching .NET MathF.Round and Swift FloatingPointRoundingRule.toNearestOrEven.
+func TargetSize(original, percent int) int {
+	val := float64(original) * float64(percent) / 100.0
+	return max(1, int(math.RoundToEven(val)))
+}
+
+// TargetSizeByMaxDim computes aspect-preserving dimensions capped at maxDim without upscaling.
+func TargetSizeByMaxDim(width, height, maxDim int) (int, int) {
+	if max(width, height) <= maxDim {
+		return width, height
+	}
+	if width >= height {
+		scaledH := max(1, int(math.RoundToEven(float64(height)*float64(maxDim)/float64(width))))
+		return maxDim, scaledH
+	}
+	scaledW := max(1, int(math.RoundToEven(float64(width)*float64(maxDim)/float64(height))))
+	return scaledW, maxDim
+}
+
+// TargetBytes returns the constant-compression-rate byte budget for outPixels.
+func TargetBytes(sourceFileBytes, sourcePixels, outPixels int64) int64 {
+	if sourcePixels <= 0 {
+		return max(MinTargetBytes, sourceFileBytes)
+	}
+	return max(MinTargetBytes, sourceFileBytes*outPixels/sourcePixels)
+}
+
+// SolveQuality binary-searches [minQuality, maxQuality] for the highest quality whose
+// encoded byte size does not exceed targetBytes. Returns minQuality if all exceed.
 func SolveQuality(encode func(int) int64, targetBytes int64, minQuality, maxQuality int) int {
+	if minQuality > maxQuality {
+		panic("imgmath: minQuality must be <= maxQuality")
+	}
 	lo, hi := minQuality, maxQuality
 	best := minQuality
 	for lo <= hi {
-		mid := (lo + hi) / 2
+		mid := lo + (hi-lo)/2
 		if encode(mid) <= targetBytes {
 			best = mid
 			lo = mid + 1
